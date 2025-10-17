@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  emailVerified Boolean    @default(false)
+  password      String
+  name          String?
+  role          String     @default("USER")
+  refreshToken  String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  boards        Board[]          @relation("UserBoards")
+  collaborations Collaboration[]
+}
+
+model Board {
+  id            String           @id @default(cuid())
+  title         String
+  ownerId       String
+  owner         User             @relation("UserBoards", fields: [ownerId], references: [id])
+  collaborators Collaboration[]
+   drawingData   String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+model Collaboration {
+  id        String   @id @default(cuid())
+  userId    String
+  boardId   String
+  user      User     @relation(fields: [userId], references: [id])
+  board     Board    @relation(fields: [boardId], references: [id])
+  role      String   @default("EDITOR")
+  joinedAt  DateTime @default(now())
+
+  @@unique([userId, boardId])
+}
+
+model Notification {
+  id         String   @id @default(cuid())
+  type       String   
+  targetId   String?  
+  identifier  String?
+  event      String?
+  message    String
+  payload    String?     
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
