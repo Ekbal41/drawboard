@@ -1,25 +1,37 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router"; // make sure it's react-router-dom
+import { useParams, useNavigate } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { useSocket } from "@/hooks/useSocket";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import api from "@/api/axios";
-
-
+import DrawCanvas from "@/components/DrawCanvas";
+import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { Loader2, Users, ArrowLeft, Save } from "lucide-react";
 
 export default function DrawBoard() {
   const { user } = useAuth();
-  const { boardId } = useParams<any>();
+  const { boardId } = useParams<{ boardId: string }>();
   const navigate = useNavigate();
-  const [text, setText] = useState("");
+  const [localDrawingData, setLocalDrawingData] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
 
-  // Socket for live collaboration
+  const { data: drawing, isLoading } = useQuery({
+    queryKey: ["boardData", boardId],
+    queryFn: () => api.get(`/main/boards/${boardId}`).then((res) => res.data),
+    enabled: !!boardId,
+  });
+
+  useEffect(() => {
+    if (drawing?.drawingData) {
+      setLocalDrawingData(drawing.drawingData);
+    }
+  }, [drawing]);
+
   const socket = useSocket(user?.id ?? "", {
-    draw: (data: { color?: string }) => {
-      console.log("Received changes:", data);
-      if (data.color !== undefined) setText(data.color);
+    draw: (data: { drawing?: any }) => {
+      if (data.drawing !== undefined) setLocalDrawingData(data.drawing);
     },
   });
 
@@ -28,63 +40,192 @@ export default function DrawBoard() {
     socket.emit("join-board", boardId);
   }, [boardId, socket]);
 
-  // React Query mutation to save board data
-  const saveMutation = useMutation<
-    void,
-    Error,
-    { boardId: string; drawing: string }
-  >(
-    async ({ boardId, drawing }) => {
+  const saveMutation = useMutation({
+    mutationFn: async ({
+      boardId,
+      drawing,
+    }: {
+      boardId: string;
+      drawing: string;
+    }) => {
       await api.post("/main/boards/save", { boardId, drawing });
     },
-    {
-      onSuccess: () => {
-        alert("Board saved successfully!");
-      },
-      onError: (err) => {
-        console.error(err);
-        alert("Failed to save board");
-      },
-    }
-  );
+    onSuccess: () => {
+      toast.success("Board saved successfully!");
+    },
+    onError: () => {
+      toast.error("Failed to save board");
+    },
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: async ({
+      boardId,
+      userEmail,
+    }: {
+      boardId: string;
+      userEmail: string;
+    }) => {
+      await api.post("/main/boards/collaborators", { boardId, userEmail });
+    },
+    onSuccess: () => {
+      toast.success("Collaborator invited successfully!");
+      setInviteEmail("");
+    },
+    onError: (e: any) => {
+      toast.error(e.response?.data?.error || "Failed to invite collaborator");
+    },
+  });
 
   const handleSave = () => {
     if (!boardId) return;
-    saveMutation.mutate({ boardId, drawing: text });
+    saveMutation.mutate({ boardId, drawing: localDrawingData });
   };
 
-  const handleBack = () => navigate("/boards"); // Adjust route as needed
+  const handleDrawingChange = (d: any) => {
+    setLocalDrawingData(d);
+    if (boardId) socket?.emit("draw", { boardId, drawing: d });
+  };
+
+  const handleBack = () => navigate("/dashboard");
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen text-gray-500">
+        <Loader2 className="animate-spin mr-2" /> Loading board data...
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-gray-50 text-center px-4">
+        <h2 className="text-2xl font-semibold text-gray-800 mb-2">
+          You’re not signed in
+        </h2>
+        <p className="text-gray-600 mb-6 max-w-md">
+          Please sign in to access this drawing board and collaborate with
+          others.
+        </p>
+        <Button onClick={() => navigate("/login")}>Go to Login</Button>
+      </div>
+    );
+  }
+
+  const isCollaborator =
+    drawing?.ownerId === user.id ||
+    drawing?.collaborators?.some(
+      (colab: any) => colab.user.email === user.email
+    );
+
+  if (!isCollaborator) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-gray-50 text-center px-4">
+        <Users className="w-12 h-12 text-gray-400 mb-3" />
+        <h2 className="text-2xl font-semibold text-gray-800 mb-2">
+          Access Restricted
+        </h2>
+        <p className="text-gray-600 mb-6 max-w-md">
+          You don’t have permission to access this board. Please ask the owner
+          to invite you as a collaborator.
+        </p>
+        <Button onClick={handleBack}>Back to Dashboard</Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative w-screen h-screen bg-gray-50 flex flex-col items-center justify-center">
-      <div className="absolute top-4 left-4 flex flex-col gap-4 bg-white p-5 rounded-lg shadow-lg min-w-[300px]">
-        <div className="flex flex-col gap-2">
-          <label className="font-medium">Board Input:</label>
-          <Input
-            type="text"
-            value={text}
-            onChange={(e) => {
-              const value = e.target.value;
-              setText(value);
-              if (boardId) socket?.emit("draw", { boardId, color: value });
-            }}
-            placeholder="Type something for collaborators..."
-          />
+    <div className="relative w-screen h-screen bg-gray-50 flex items-center justify-center">
+      <DrawCanvas
+        onChange={handleDrawingChange}
+        defaultData={localDrawingData}
+      />
+      <div className="absolute top-6 bottom-6 left-6 flex flex-col gap-5 bg-white p-5 rounded-2xl shadow-xl w-[320px] border border-gray-200">
+        <div>
+          <h3 className="text-lg font-semibold mb-3 text-gray-800">
+            📝 {drawing?.title || "Untitled Board"}
+          </h3>
         </div>
 
-        <div className="flex gap-2 mt-2">
-          <Button
-            onClick={handleSave}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            Save
-          </Button>
-          <Button
-            onClick={handleBack}
-            className="bg-gray-300 hover:bg-gray-400 text-black"
-          >
-            Back
-          </Button>
+        <Button
+          onClick={handleSave}
+          className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+          disabled={saveMutation.isPending}
+        >
+          <Save size={16} /> Save
+        </Button>
+        <Button
+          onClick={handleBack}
+          className="bg-gray-200 hover:bg-gray-300 text-gray-800 flex items-center gap-2"
+        >
+          <ArrowLeft size={16} /> Exit to Dashboard
+        </Button>
+      </div>
+      <div className="absolute top-6 bottom-6 right-6 flex flex-col gap-5 bg-white p-5 rounded-2xl shadow-xl w-[320px] border border-gray-200">
+        <div>
+          <h3 className="text-lg font-semibold mb-3 text-gray-800">
+            Collaborators
+          </h3>
+
+          <div className="flex items-center gap-2 mb-3">
+            <Input
+              type="email"
+              placeholder="Collaborator’s Email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+            />
+            <Button
+              onClick={() => {
+                if (!boardId) return;
+                inviteMutation.mutate({ boardId, userEmail: inviteEmail });
+              }}
+              disabled={inviteMutation.isPending}
+            >
+              Invite
+            </Button>
+          </div>
+
+          {drawing?.collaborators?.length > 0 ? (
+            <ul className="text-sm text-gray-700 space-y-1">
+              {drawing.collaborators.map((colab: any) => (
+                <li
+                  key={colab.user.email}
+                  className="flex items-center gap-2 p-1.5 rounded-md hover:bg-gray-100 transition"
+                >
+                  <div className="rounded-full bg-muted p-3">
+                    <Users size={16} className="text-gray-500" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">
+                      {colab.user.name || "Unnamed"}
+                    </p>
+                    <p> ({colab.user.email})</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-gray-500 text-sm italic">
+              No collaborators yet.
+            </p>
+          )}
+
+          <div className="mt-6 pt-4 border-t border-gray-200 space-y-4">
+            <div className="mt-4 text-sm text-gray-600 overflow-x-auto">
+              {window.location.origin}/board/{boardId}
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => {
+                navigator.clipboard.writeText(
+                  `${window.location.origin}/board/${boardId}`
+                );
+                toast.success("Board link copied to clipboard!");
+              }}
+            >
+              Copy Board Link
+            </Button>
+          </div>
         </div>
       </div>
     </div>
