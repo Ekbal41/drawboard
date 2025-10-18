@@ -1,12 +1,13 @@
 generator client {
   provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  shadowDatabaseUrl=env("SHADOW_DATABASE_URL")
 }
-
 model User {
   id            String     @id @default(cuid())
   email         String     @unique
@@ -28,7 +29,7 @@ model Board {
   ownerId       String
   owner         User             @relation("UserBoards", fields: [ownerId], references: [id])
   collaborators Collaboration[]
-   drawingData   String?
+  drawingData   Json?           
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
 }
@@ -46,13 +47,13 @@ model Collaboration {
 }
 
 model Notification {
-  id         String   @id @default(cuid())
-  type       String   
-  targetId   String?  
+  id          String   @id @default(cuid())
+  type        String
+  targetId    String?
   identifier  String?
-  event      String?
-  message    String
-  payload    String?     
-  read       Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  event       String?
+  message     String
+  payload     Json?  
+  read        Boolean   @default(false)
+  createdAt   DateTime  @default(now())
 }
