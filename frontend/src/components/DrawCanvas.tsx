@@ -8,6 +8,8 @@ import {
   RegularPolygon,
   Text,
   Transformer,
+  Label,
+  Tag,
 } from "react-konva";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -30,6 +32,9 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useParams } from "react-router";
+import { useSocket } from "@/hooks/useSocket";
 
 export interface ShapeLine {
   id: string;
@@ -49,6 +54,11 @@ export interface ShapeLine {
 interface DrawCanvasProps {
   lines: ShapeLine[];
   onLinesChange: (lines: ShapeLine[]) => void;
+  onCursorMove?: (x: number, y: number) => void;
+  remoteCursors?: Record<
+    string,
+    { x: number; y: number; name: string; color: string }
+  >;
 }
 
 type Tool =
@@ -75,7 +85,12 @@ const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3;
 const ZOOM_STEP = 0.25;
 
-export default function DrawCanvas({ lines, onLinesChange }: DrawCanvasProps) {
+export default function DrawCanvas({
+  lines,
+  onLinesChange,
+  onCursorMove,
+  remoteCursors,
+}: DrawCanvasProps) {
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState<Tool>("brush");
   const [color, setColor] = useState("#000000");
@@ -90,6 +105,9 @@ export default function DrawCanvas({ lines, onLinesChange }: DrawCanvasProps) {
 
   const stageRef = useRef<any>(null);
   const transformerRef = useRef<any>(null);
+  const { user } = useAuth();
+  const { boardId } = useParams<{ boardId: string }>();
+  const socket = useSocket(user?.id ?? "", {});
 
   useEffect(() => {
     if (history.length === 1 && history[0].length === 0 && lines.length > 0) {
@@ -376,6 +394,15 @@ export default function DrawCanvas({ lines, onLinesChange }: DrawCanvasProps) {
 
   const getCursor = () =>
     tool === "select" ? "default" : tool === "text" ? "text" : "crosshair";
+  const handleMouseMove = (e: any) => {
+    const stage = e.target.getStage();
+    const pos = stage.getPointerPosition();
+    if (!pos) return;
+    if (onCursorMove) {
+      onCursorMove(pos.x, pos.y);
+    }
+    drawing(e);
+  };
 
   const renderShape = (line: ShapeLine) => {
     const isSelected = line.id === selectedId;
@@ -480,7 +507,10 @@ export default function DrawCanvas({ lines, onLinesChange }: DrawCanvasProps) {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-gradient-to-br from-background to-muted">
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-card/95 backdrop-blur px-4 py-3 rounded-2xl shadow-2xl border border-border">
+      <div
+        className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-card/95 
+        backdrop-blur px-4 py-3 rounded-2xl shadow-2xl border border-border"
+      >
         <div className="flex gap-1 border-r border-border pr-2">
           <Button
             size="sm"
@@ -581,7 +611,10 @@ export default function DrawCanvas({ lines, onLinesChange }: DrawCanvasProps) {
           )}
         </div>
       </div>
-      <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 bg-card/95 backdrop-blur p-3 rounded-2xl shadow-2xl border border-border flex flex-col gap-3">
+      <div
+        className="absolute left-4 top-1/2 -translate-y-1/2 z-50 bg-card/95 backdrop-blur p-3 
+        rounded-2xl shadow-2xl border border-border flex flex-col gap-3"
+      >
         <Popover>
           <PopoverTrigger asChild>
             <Button
@@ -636,7 +669,10 @@ export default function DrawCanvas({ lines, onLinesChange }: DrawCanvasProps) {
           </div>
         </div>
       </div>
-      <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 bg-card/95 backdrop-blur p-3 rounded-2xl shadow-2xl border border-border flex flex-col gap-2">
+      <div
+        className="absolute right-4 top-1/2 -translate-y-1/2 z-50 bg-card/95 backdrop-blur 
+        p-3 rounded-2xl shadow-2xl border border-border flex flex-col gap-2"
+      >
         <Button
           size="sm"
           variant="ghost"
@@ -685,7 +721,10 @@ export default function DrawCanvas({ lines, onLinesChange }: DrawCanvasProps) {
       </div>
       {selectedId &&
         lines.find((l) => l.id === selectedId)?.type === "text" && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 bg-card/95 backdrop-blur p-4 rounded-2xl shadow-2xl border border-border w-[600px]">
+          <div
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 bg-card/95 backdrop-blur 
+            p-4 rounded-2xl shadow-2xl border border-border w-[600px]"
+          >
             <div className="flex gap-3">
               <Input
                 value={textInput}
@@ -717,7 +756,10 @@ export default function DrawCanvas({ lines, onLinesChange }: DrawCanvasProps) {
           </div>
         )}
       {selectedId && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-medium shadow-lg">
+        <div
+          className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-primary 
+          text-primary-foreground px-4 py-2 rounded-full text-sm font-medium shadow-lg"
+        >
           Selected:{" "}
           {lines.find((l) => l.id === selectedId)?.type?.toUpperCase()} • Drag
           to move, use handles to resize
@@ -732,12 +774,17 @@ export default function DrawCanvas({ lines, onLinesChange }: DrawCanvasProps) {
         x={stagePos.x}
         y={stagePos.y}
         onMouseDown={startDrawing}
-        onMouseMove={drawing}
         onMouseUp={endDrawing}
         onClick={handleStageClick}
         onWheel={handleWheel}
         draggable={tool === "select" && !selectedId}
         style={{ cursor: getCursor() }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => {
+          if (boardId && socket && user) {
+            socket.emit("cursor-leave", { boardId, userId: user.id });
+          }
+        }}
       >
         <Layer>
           {lines.map(renderShape)}
@@ -757,8 +804,43 @@ export default function DrawCanvas({ lines, onLinesChange }: DrawCanvasProps) {
             />
           )}
         </Layer>
+        <Layer>
+          {remoteCursors &&
+            Object.entries(remoteCursors).map(([userId, cursor]) => (
+              <div key={userId}>
+                <RegularPolygon
+                  x={cursor.x}
+                  y={cursor.y}
+                  sides={3}
+                  radius={10}
+                  fill={cursor.color}
+                  rotation={90}
+                  shadowBlur={4}
+                  shadowColor="rgba(0,0,0,0.3)"
+                />
+                <Label x={cursor.x + 20} y={cursor.y - 0}>
+                  <Tag
+                    fill={cursor.color}
+                    cornerRadius={4}
+                    shadowColor="rgba(0,0,0,0.3)"
+                    shadowBlur={2}
+                    shadowOffset={{ x: 1, y: 1 }}
+                  />
+                  <Text
+                    text={cursor.name}
+                    fontSize={12}
+                    fill="white"
+                    padding={6}
+                  />
+                </Label>
+              </div>
+            ))}
+        </Layer>
       </Stage>
-      <div className="absolute bottom-4 right-4 z-40 bg-card/90 text-card-foreground px-3 py-2 rounded-lg text-xs font-mono border border-border shadow-lg">
+      <div
+        className="absolute bottom-4 right-4 z-40 bg-card/90 text-card-foreground 
+        px-3 py-2 rounded-lg text-xs font-mono border border-border shadow-lg"
+      >
         Objects: {lines.length} | History: {historyIndex + 1}/{history.length} |
         Zoom: {Math.round(zoom * 100)}%
       </div>

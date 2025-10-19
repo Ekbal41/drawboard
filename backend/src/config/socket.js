@@ -4,6 +4,7 @@ const logger = require("../utils/logger");
 let io;
 const userSockets = new Map();
 const boardUsers = new Map();
+const boardCursors = new Map();
 
 const initSocket = (server) => {
   io = new Server(server, {
@@ -20,11 +21,13 @@ const initSocket = (server) => {
       userSockets.set(userId, socket.id);
       logger.info(`User ${userId} registered with socket ${socket.id}.`);
     });
-    // --------------------------------------------------------------------
+
     socket.on("join-board", (boardId) => {
       socket.join(boardId);
       if (!boardUsers.has(boardId)) boardUsers.set(boardId, new Set());
       boardUsers.get(boardId).add(socket.id);
+      if (!boardCursors.has(boardId)) boardCursors.set(boardId, new Map());
+
       logger.info(`Socket ${socket.id} joined board ${boardId}`);
     });
 
@@ -35,11 +38,32 @@ const initSocket = (server) => {
       );
       socket.to(boardId).emit("draw", stroke);
     });
-    // --------------------------------------------------------------------
+
+    socket.on("cursor-move", (data) => {
+      const { boardId, userId, userName, x, y } = data;
+
+      if (boardCursors.has(boardId)) {
+        boardCursors.get(boardId).set(userId, { userName, x, y });
+      }
+      socket.to(boardId).emit("cursor-update", { userId, userName, x, y });
+    });
+
+    socket.on("cursor-leave", (data) => {
+      const { boardId, userId } = data;
+      if (boardCursors.has(boardId)) {
+        boardCursors.get(boardId).delete(userId);
+      }
+      socket.to(boardId).emit("cursor-remove", { userId });
+
+      logger.info(`User ${userId} cursor left board ${boardId}`);
+    });
+
     socket.on("disconnect", () => {
+      let disconnectedUserId = null;
       for (let [userId, id] of userSockets.entries()) {
         if (id === socket.id) {
           userSockets.delete(userId);
+          disconnectedUserId = userId;
           logger.info(`User ${userId} disconnected and unregistered.`);
           break;
         }
@@ -48,7 +72,19 @@ const initSocket = (server) => {
         if (sockets.has(socket.id)) {
           sockets.delete(socket.id);
           logger.info(`Socket ${socket.id} left board ${boardId}`);
-          if (sockets.size === 0) boardUsers.delete(boardId);
+
+          if (disconnectedUserId && boardCursors.has(boardId)) {
+            boardCursors.get(boardId).delete(disconnectedUserId);
+            io.to(boardId).emit("cursor-remove", {
+              userId: disconnectedUserId,
+            });
+          }
+
+          if (sockets.size === 0) {
+            boardUsers.delete(boardId);
+            boardCursors.delete(boardId);
+            logger.info(`Board ${boardId} is now empty, cleaned up.`);
+          }
         }
       }
     });
@@ -76,9 +112,21 @@ const broadcast = (event, data) => {
   getIO().emit(event, data);
 };
 
+const getBoardCursors = (boardId) => {
+  if (boardCursors.has(boardId)) {
+    const cursors = {};
+    for (const [userId, cursorData] of boardCursors.get(boardId).entries()) {
+      cursors[userId] = cursorData;
+    }
+    return cursors;
+  }
+  return {};
+};
+
 module.exports = {
   initSocket,
   getIO,
   emitToUser,
   broadcast,
+  getBoardCursors,
 };

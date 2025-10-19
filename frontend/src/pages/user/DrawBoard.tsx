@@ -18,6 +18,36 @@ export default function DrawBoard() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [expanded, setExpanded] = useState(false);
   const isRemoteUpdate = useRef(false);
+  const [cursors, setCursors] = useState<
+    Record<
+      string,
+      {
+        x: number;
+        y: number;
+        name: string;
+        color: string;
+      }
+    >
+  >({});
+
+  const getUserColor = (userId: string) => {
+    const figmaColors = [
+      "#0D99FF",
+      "#F24822",
+      "#FF7B00",
+      "#14AE5C",
+      "#A259FF",
+      "#E62C46",
+      "#FFCD29",
+      "#9C27B0",
+    ];
+
+    const hash = userId
+      .split("")
+      .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+
+    return figmaColors[hash % figmaColors.length];
+  };
 
   const { data: drawing, isLoading } = useQuery({
     queryKey: ["boardData", boardId],
@@ -52,6 +82,29 @@ export default function DrawBoard() {
           console.error("Failed to parse socket drawing data", err);
         }
       }
+    },
+    "cursor-update": (data: {
+      userId: string;
+      userName: string;
+      x: number;
+      y: number;
+    }) => {
+      setCursors((prev) => ({
+        ...prev,
+        [data.userId]: {
+          x: data.x,
+          y: data.y,
+          name: data.userName,
+          color: getUserColor(data.userId),
+        },
+      }));
+    },
+    "cursor-remove": (data: { userId: string }) => {
+      setCursors((prev) => {
+        const newCursors = { ...prev };
+        delete newCursors[data.userId];
+        return newCursors;
+      });
     },
   });
 
@@ -177,7 +230,22 @@ export default function DrawBoard() {
 
   return (
     <div className="relative w-screen h-screen bg-gray-50 flex items-center justify-center">
-      <DrawCanvas lines={lines} onLinesChange={handleLinesChange} />
+      <DrawCanvas
+        lines={lines}
+        onLinesChange={handleLinesChange}
+        onCursorMove={(x, y) => {
+          if (boardId && socket && user) {
+            socket.emit("cursor-move", {
+              boardId,
+              userId: user.id,
+              userName: user.name || user.email,
+              x,
+              y,
+            });
+          }
+        }}
+        remoteCursors={cursors}
+      />
       <div className="absolute top-6 z-50 left-6 flex items-center gap-2">
         <Button
           onClick={() => setExpanded(!expanded)}
