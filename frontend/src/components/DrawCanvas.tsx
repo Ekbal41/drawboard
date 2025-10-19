@@ -31,26 +31,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 
-// ============================================
-// TYPES & INTERFACES
-// ============================================
-
-interface DrawCanvasProps {
-  defaultData?: string;
-  onChange?: (data: string) => void;
-}
-
-type Tool =
-  | "brush"
-  | "eraser"
-  | "rect"
-  | "circle"
-  | "triangle"
-  | "line"
-  | "text"
-  | "select";
-
-interface ShapeLine {
+export interface ShapeLine {
   id: string;
   type: Tool;
   points?: number[];
@@ -65,9 +46,20 @@ interface ShapeLine {
   fontSize?: number;
 }
 
-// ============================================
-// CONSTANTS
-// ============================================
+interface DrawCanvasProps {
+  lines: ShapeLine[];
+  onLinesChange: (lines: ShapeLine[]) => void;
+}
+
+type Tool =
+  | "brush"
+  | "eraser"
+  | "rect"
+  | "circle"
+  | "triangle"
+  | "line"
+  | "text"
+  | "select";
 
 const COLORS = [
   "#000000",
@@ -83,97 +75,28 @@ const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3;
 const ZOOM_STEP = 0.25;
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
-
-export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
-  // ============================================
-  // STATE MANAGEMENT
-  // ============================================
-
-  // Canvas state
-  const [lines, setLines] = useState<ShapeLine[]>([]);
+export default function DrawCanvas({ lines, onLinesChange }: DrawCanvasProps) {
   const [isDrawing, setIsDrawing] = useState(false);
-
-  // Tool state
   const [tool, setTool] = useState<Tool>("brush");
   const [color, setColor] = useState("#000000");
   const [strokeWidth, setStrokeWidth] = useState(3);
   const [fontSize, setFontSize] = useState(24);
-
-  // Selection state
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [textInput, setTextInput] = useState("");
-
-  // History state
   const [history, setHistory] = useState<ShapeLine[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
-
-  // View state
   const [zoom, setZoom] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
 
-  // ============================================
-  // REFS
-  // ============================================
-
   const stageRef = useRef<any>(null);
   const transformerRef = useRef<any>(null);
-  const isLoadingDefault = useRef(true);
-  const prevDefaultDataRef = useRef<string | undefined>(defaultData);
-
-  // ============================================
-  // EFFECTS - DATA SYNC
-  // ============================================
-
-  // Load defaultData only when it actually changes (not from our own updates)
-  useEffect(() => {
-    if (!defaultData || defaultData === prevDefaultDataRef.current) return;
-
-    try {
-      const parsed = JSON.parse(defaultData);
-      if (Array.isArray(parsed)) {
-        const currentData = JSON.stringify(lines);
-        // Only update if the data is actually different
-        if (defaultData !== currentData) {
-          setLines(parsed);
-          if (isLoadingDefault.current) {
-            setHistory([parsed]);
-            setHistoryIndex(0);
-            isLoadingDefault.current = false;
-          }
-        }
-      }
-    } catch (err) {
-      console.warn("Invalid defaultData", err);
-    }
-
-    prevDefaultDataRef.current = defaultData;
-  }, [defaultData]);
-
-  // Call onChange whenever lines change (with ref to prevent infinite loops)
-  const onChangeRef = useRef(onChange);
-  useEffect(() => {
-    onChangeRef.current = onChange;
-  }, [onChange]);
 
   useEffect(() => {
-    if (!isLoadingDefault.current && onChangeRef.current) {
-      const dataStr = JSON.stringify(lines);
-      // Only call onChange if data actually changed
-      if (dataStr !== prevDefaultDataRef.current) {
-        onChangeRef.current(dataStr);
-        prevDefaultDataRef.current = dataStr;
-      }
+    if (history.length === 1 && history[0].length === 0 && lines.length > 0) {
+      setHistory([lines]);
     }
   }, [lines]);
 
-  // ============================================
-  // EFFECTS - UI SYNC
-  // ============================================
-
-  // Update transformer when selection changes
   useEffect(() => {
     if (selectedId && transformerRef.current && tool === "select") {
       const node = stageRef.current?.findOne(`#${selectedId}`);
@@ -186,10 +109,8 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
     }
   }, [selectedId, tool]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Undo: Ctrl+Z
       if (
         (e.ctrlKey || e.metaKey) &&
         e.key === "z" &&
@@ -199,7 +120,6 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
         e.preventDefault();
         undo();
       }
-      // Redo: Ctrl+Y or Ctrl+Shift+Z
       if (
         ((e.ctrlKey || e.metaKey) && e.key === "y") ||
         ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "z")
@@ -209,7 +129,6 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
           redo();
         }
       }
-      // Delete: Delete or Backspace
       if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
         if (!(e.target instanceof HTMLInputElement)) {
           e.preventDefault();
@@ -221,26 +140,27 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [historyIndex, history, selectedId]);
 
-  // ============================================
-  // DRAWING HANDLERS
-  // ============================================
+  const updateLines = (newLines: ShapeLine[]) => {
+    onLinesChange(newLines);
+  };
+
+  const updateHistory = (newLines: ShapeLine[]) => {
+    const newHistory = [...history.slice(0, historyIndex + 1), newLines];
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
 
   const startDrawing = (e: any) => {
     if (tool === "select") return;
-
     const stage = e.target.getStage();
     const pos = stage.getPointerPosition();
     if (!pos) return;
-
-    // Adjust for zoom and pan
     const adjustedPos = {
       x: (pos.x - stagePos.x) / zoom,
       y: (pos.y - stagePos.y) / zoom,
     };
-
     setIsDrawing(true);
     setSelectedId(null);
-
     const newShape: ShapeLine = {
       id: `${Date.now()}_${Math.random()}`,
       type: tool,
@@ -263,48 +183,40 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
             radius: 0,
           }),
     };
-
-    setLines((prev) => [...prev, newShape]);
+    updateLines([...lines, newShape]);
   };
 
   const drawing = (e: any) => {
     if (!isDrawing || tool === "select") return;
-
     const stage = e.target.getStage();
     const pos = stage.getPointerPosition();
     if (!pos) return;
-
     const adjustedPos = {
       x: (pos.x - stagePos.x) / zoom,
       y: (pos.y - stagePos.y) / zoom,
     };
-
-    setLines((prev) => {
-      const newLines = [...prev];
-      const last = newLines[newLines.length - 1];
-      if (!last) return prev;
-
-      if (tool === "brush" || tool === "eraser") {
-        last.points = last.points!.concat([adjustedPos.x, adjustedPos.y]);
-      } else if (tool === "rect") {
-        last.width = adjustedPos.x - last.x!;
-        last.height = adjustedPos.y - last.y!;
-      } else if (tool === "circle" || tool === "triangle") {
-        const dx = adjustedPos.x - last.x!;
-        const dy = adjustedPos.y - last.y!;
-        last.radius = Math.sqrt(dx * dx + dy * dy);
-      } else if (tool === "line") {
-        last.width = adjustedPos.x - last.x!;
-        last.height = adjustedPos.y - last.y!;
-      }
-      return newLines;
-    });
+    const newLines = [...lines];
+    const last = newLines[newLines.length - 1];
+    if (!last) return;
+    if (tool === "brush" || tool === "eraser") {
+      last.points = last.points!.concat([adjustedPos.x, adjustedPos.y]);
+    } else if (tool === "rect") {
+      last.width = adjustedPos.x - last.x!;
+      last.height = adjustedPos.y - last.y!;
+    } else if (tool === "circle" || tool === "triangle") {
+      const dx = adjustedPos.x - last.x!;
+      const dy = adjustedPos.y - last.y!;
+      last.radius = Math.sqrt(dx * dx + dy * dy);
+    } else if (tool === "line") {
+      last.width = adjustedPos.x - last.x!;
+      last.height = adjustedPos.y - last.y!;
+    }
+    updateLines(newLines);
   };
 
   const endDrawing = () => {
     if (!isDrawing) return;
     setIsDrawing(false);
-
     const lastShape = lines[lines.length - 1];
     if (lastShape?.type === "text") {
       setSelectedId(lastShape.id);
@@ -312,10 +224,6 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
     }
     updateHistory(lines);
   };
-
-  // ============================================
-  // SELECTION HANDLERS
-  // ============================================
 
   const handleStageClick = (e: any) => {
     if (tool !== "select" || e.target !== e.target.getStage()) return;
@@ -325,13 +233,9 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
 
   const handleShapeClick = (id: string, e?: any) => {
     if (tool !== "select") return;
-    if (e) {
-      e.cancelBubble = true;
-    }
-
+    if (e) e.cancelBubble = true;
     const wasSelected = selectedId === id;
     setSelectedId(wasSelected ? null : id);
-
     const shape = lines.find((l) => l.id === id);
     if (shape && shape.type === "text" && !wasSelected) {
       setTextInput(shape.text || "");
@@ -340,18 +244,12 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
     }
   };
 
-  // ============================================
-  // TRANSFORM HANDLERS
-  // ============================================
-
   const handleTransform = (id: string, e: any) => {
     const node = e.target;
     const scaleX = node.scaleX();
     const scaleY = node.scaleY();
-
     const newLines = lines.map((line) => {
       if (line.id !== id) return line;
-
       if (line.type === "rect") {
         return {
           ...line,
@@ -377,39 +275,25 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
       }
       return { ...line, x: node.x(), y: node.y() };
     });
-
     node.scaleX(1);
     node.scaleY(1);
-    setLines(newLines);
+    updateLines(newLines);
   };
 
   const handleDragEnd = (id: string, e: any) => {
     const node = e.target;
     const newLines = lines.map((l) => {
       if (l.id !== id) return l;
-
-      // Get the position adjusted for zoom and pan
       const newX = node.x();
       const newY = node.y();
-
-      // For circles and triangles, we need to account for their center position
       if (l.type === "circle" || l.type === "triangle") {
-        return {
-          ...l,
-          x: newX - (l.radius || 0),
-          y: newY - (l.radius || 0),
-        };
+        return { ...l, x: newX - (l.radius || 0), y: newY - (l.radius || 0) };
       }
-
       return { ...l, x: newX, y: newY };
     });
-    setLines(newLines);
+    updateLines(newLines);
     updateHistory(newLines);
   };
-
-  // ============================================
-  // TEXT HANDLERS
-  // ============================================
 
   const handleTextSubmit = () => {
     if (!selectedId) return;
@@ -418,41 +302,27 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
         ? { ...l, text: textInput || "Text", fontSize: fontSize / zoom }
         : l
     );
-    setLines(newLines);
+    updateLines(newLines);
     updateHistory(newLines);
-  };
-
-  // ============================================
-  // HISTORY HANDLERS
-  // ============================================
-
-  const updateHistory = (newLines: ShapeLine[]) => {
-    const newHistory = [...history.slice(0, historyIndex + 1), newLines];
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
   };
 
   const undo = () => {
     if (historyIndex <= 0) return;
     setHistoryIndex(historyIndex - 1);
-    setLines([...history[historyIndex - 1]]);
+    updateLines([...history[historyIndex - 1]]);
     setSelectedId(null);
   };
 
   const redo = () => {
     if (historyIndex >= history.length - 1) return;
     setHistoryIndex(historyIndex + 1);
-    setLines([...history[historyIndex + 1]]);
+    updateLines([...history[historyIndex + 1]]);
     setSelectedId(null);
   };
 
-  // ============================================
-  // ACTION HANDLERS
-  // ============================================
-
   const clear = () => {
     if (!confirm("Clear canvas?")) return;
-    setLines([]);
+    updateLines([]);
     updateHistory([]);
     setSelectedId(null);
   };
@@ -460,7 +330,7 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
   const deleteSelected = () => {
     if (!selectedId) return;
     const newLines = lines.filter((l) => l.id !== selectedId);
-    setLines(newLines);
+    updateLines(newLines);
     updateHistory(newLines);
     setSelectedId(null);
   };
@@ -474,18 +344,10 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
     link.click();
   };
 
-  // ============================================
-  // ZOOM HANDLERS
-  // ============================================
-
-  const handleZoomIn = () => {
+  const handleZoomIn = () =>
     setZoom((prev) => Math.min(MAX_ZOOM, prev + ZOOM_STEP));
-  };
-
-  const handleZoomOut = () => {
+  const handleZoomOut = () =>
     setZoom((prev) => Math.max(MIN_ZOOM, prev - ZOOM_STEP));
-  };
-
   const resetZoom = () => {
     setZoom(1);
     setStagePos({ x: 0, y: 0 });
@@ -493,22 +355,18 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
 
   const handleWheel = (e: any) => {
     e.evt.preventDefault();
-
     const stage = e.target.getStage();
     const oldScale = stage.scaleX();
     const pointer = stage.getPointerPosition();
-
     const mousePointTo = {
       x: (pointer.x - stage.x()) / oldScale,
       y: (pointer.y - stage.y()) / oldScale,
     };
-
     const direction = e.evt.deltaY > 0 ? -1 : 1;
     const newScale = Math.max(
       MIN_ZOOM,
       Math.min(MAX_ZOOM, oldScale + direction * 0.05)
     );
-
     setZoom(newScale);
     setStagePos({
       x: pointer.x - mousePointTo.x * newScale,
@@ -516,15 +374,8 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
     });
   };
 
-  // ============================================
-  // RENDER HELPERS
-  // ============================================
-
-  const getCursor = () => {
-    if (tool === "select") return "default";
-    if (tool === "text") return "text";
-    return "crosshair";
-  };
+  const getCursor = () =>
+    tool === "select" ? "default" : tool === "text" ? "text" : "crosshair";
 
   const renderShape = (line: ShapeLine) => {
     const isSelected = line.id === selectedId;
@@ -554,7 +405,6 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
         />
       );
     }
-
     if (line.type === "rect") {
       return (
         <Rect
@@ -569,7 +419,6 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
         />
       );
     }
-
     if (line.type === "circle") {
       return (
         <Circle
@@ -583,7 +432,6 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
         />
       );
     }
-
     if (line.type === "triangle") {
       return (
         <RegularPolygon
@@ -598,7 +446,6 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
         />
       );
     }
-
     if (line.type === "line") {
       return (
         <Line
@@ -615,7 +462,6 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
         />
       );
     }
-
     if (line.type === "text") {
       return (
         <Text
@@ -629,19 +475,12 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
         />
       );
     }
-
     return null;
   };
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-gradient-to-br from-background to-muted">
-      {/* Top Toolbar - Tools & Actions */}
-      <div
-        className="absolute top-4 left-1/2 -translate-x-1/2 z-50 
-      flex items-center gap-2 bg-card/95 backdrop-blur px-4 py-3 
-      rounded-2xl shadow-2xl border border-border"
-      >
-        {/* Drawing Tools */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-card/95 backdrop-blur px-4 py-3 rounded-2xl shadow-2xl border border-border">
         <div className="flex gap-1 border-r border-border pr-2">
           <Button
             size="sm"
@@ -668,8 +507,6 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
             <Eraser size={16} />
           </Button>
         </div>
-
-        {/* Shape Tools */}
         <div className="flex gap-1 border-r border-border pr-2">
           <Button
             size="sm"
@@ -712,8 +549,6 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
             <Type size={16} />
           </Button>
         </div>
-
-        {/* History Actions */}
         <div className="flex gap-1">
           <Button
             size="sm"
@@ -746,12 +581,7 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
           )}
         </div>
       </div>
-
-      {/* Left Sidebar - Color & Stroke */}
-      <div
-        className="absolute left-4 top-1/2 -translate-y-1/2 z-50 bg-card/95 
-      backdrop-blur p-3 rounded-2xl shadow-2xl border border-border flex flex-col gap-3"
-      >
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 bg-card/95 backdrop-blur p-3 rounded-2xl shadow-2xl border border-border flex flex-col gap-3">
         <Popover>
           <PopoverTrigger asChild>
             <Button
@@ -790,7 +620,6 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
             />
           </PopoverContent>
         </Popover>
-
         <div className="flex flex-col items-center gap-2 py-2">
           <div className="text-xs font-medium text-muted-foreground">Width</div>
           <Slider
@@ -807,12 +636,7 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
           </div>
         </div>
       </div>
-
-      {/* Right Sidebar - Zoom & Actions */}
-      <div
-        className="absolute right-4 top-1/2 -translate-y-1/2 z-50 bg-card/95 
-      backdrop-blur p-3 rounded-2xl shadow-2xl border border-border flex flex-col gap-2"
-      >
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 bg-card/95 backdrop-blur p-3 rounded-2xl shadow-2xl border border-border flex flex-col gap-2">
         <Button
           size="sm"
           variant="ghost"
@@ -859,14 +683,9 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
           <Trash2 size={18} />
         </Button>
       </div>
-
-      {/* Text Editor Panel */}
       {selectedId &&
         lines.find((l) => l.id === selectedId)?.type === "text" && (
-          <div
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 bg-card/95 
-          backdrop-blur p-4 rounded-2xl shadow-2xl border border-border w-[600px]"
-          >
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 bg-card/95 backdrop-blur p-4 rounded-2xl shadow-2xl border border-border w-[600px]">
             <div className="flex gap-3">
               <Input
                 value={textInput}
@@ -897,20 +716,13 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
             </div>
           </div>
         )}
-
-      {/* Selection Indicator */}
       {selectedId && (
-        <div
-          className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-primary 
-          text-primary-foreground px-4 py-2 rounded-full text-sm font-medium shadow-lg"
-        >
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-medium shadow-lg">
           Selected:{" "}
           {lines.find((l) => l.id === selectedId)?.type?.toUpperCase()} • Drag
           to move, use handles to resize
         </div>
       )}
-
-      {/* Canvas */}
       <Stage
         width={window.innerWidth}
         height={window.innerHeight}
@@ -929,7 +741,6 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
       >
         <Layer>
           {lines.map(renderShape)}
-          {/* Transformer for selected shape */}
           {tool === "select" && selectedId && (
             <Transformer
               ref={transformerRef}
@@ -947,10 +758,7 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
           )}
         </Layer>
       </Stage>
-      <div
-        className="absolute bottom-4 right-4 z-40 bg-card/90 text-card-foreground 
-        px-3 py-2 rounded-lg text-xs font-mono border border-border shadow-lg"
-      >
+      <div className="absolute bottom-4 right-4 z-40 bg-card/90 text-card-foreground px-3 py-2 rounded-lg text-xs font-mono border border-border shadow-lg">
         Objects: {lines.length} | History: {historyIndex + 1}/{history.length} |
         Zoom: {Math.round(zoom * 100)}%
       </div>
