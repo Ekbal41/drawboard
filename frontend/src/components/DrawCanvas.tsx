@@ -1,9 +1,21 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Stage, Layer, Line, Rect, Circle, RegularPolygon } from "react-konva";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Undo, Redo, Trash2, Brush, Square, Triangle, Eraser } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Undo,
+  Redo,
+  Trash2,
+  Brush,
+  Square,
+  Triangle,
+  Eraser,
+} from "lucide-react";
 
 interface DrawCanvasProps {
   defaultData?: string;
@@ -43,8 +55,8 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
     const handleResize = () => {
       setDimensions({ width: window.innerWidth, height: window.innerHeight });
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const isInitialMount = useRef(true);
@@ -53,27 +65,30 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
     const handleResize = () => {
       setDimensions({ width: window.innerWidth, height: window.innerHeight });
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      if (defaultData) {
-        try {
-          const parsed: ShapeLine[] = JSON.parse(defaultData);
-          if (Array.isArray(parsed)) {
-            setLines(parsed);
-            historyRef.current = [parsed];
-            setHistoryIndex(0);
-          }
-        } catch {
-          console.warn("Invalid defaultData");
-        }
+    if (!defaultData) {
+      setLines([]);
+      historyRef.current = [[]];
+      setHistoryIndex(0);
+      return;
+    }
+  
+    try {
+      const parsed: ShapeLine[] = JSON.parse(defaultData);
+      if (Array.isArray(parsed)) {
+        setLines(parsed);
+        historyRef.current = [parsed];
+        setHistoryIndex(0);
       }
+    } catch (err) {
+      console.warn("Invalid defaultData", err);
     }
   }, [defaultData]);
+  
 
   const startDrawing = (e: any) => {
     const pos = e.target.getStage().getPointerPosition();

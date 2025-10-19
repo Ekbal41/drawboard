@@ -31,6 +31,7 @@ export default function DrawBoard() {
 
   const socket = useSocket(user?.id ?? "", {
     draw: (data: { drawing?: any }) => {
+      console.log("Received drawing data via socket:", data);
       if (data.drawing !== undefined) setLocalDrawingData(data.drawing);
     },
   });
@@ -161,7 +162,7 @@ export default function DrawBoard() {
           <ArrowLeft size={16} /> Exit to Dashboard
         </Button>
       </div>
-      <div className="absolute top-6 bottom-6 right-6 flex flex-col gap-5 bg-white p-5 rounded-2xl shadow-xl w-[320px] border border-gray-200">
+      {/* <div className="absolute top-6 bottom-6 right-6 flex flex-col gap-5 bg-white p-5 rounded-2xl shadow-xl w-[320px] border border-gray-200">
         <div>
           <h3 className="text-lg font-semibold mb-3 text-gray-800">
             Collaborators
@@ -227,7 +228,7 @@ export default function DrawBoard() {
             </Button>
           </div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }
