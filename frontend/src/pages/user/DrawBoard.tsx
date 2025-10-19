@@ -141,13 +141,12 @@ export default function DrawBoard() {
         onChange={handleDrawingChange}
         defaultData={localDrawingData}
       />
-      <div className="absolute top-6 bottom-6 left-6 flex flex-col gap-5 bg-white p-5 rounded-2xl shadow-xl w-[320px] border border-gray-200">
-        <div>
+      <div className="absolute top-6  left-6 flex flex-col gap-5 bg-white p-5 rounded-2xl shadow-xl w-[320px] border border-gray-200">
+        {/* <div>
           <h3 className="text-lg font-semibold mb-3 text-gray-800">
             📝 {drawing?.title || "Untitled Board"}
           </h3>
-        </div>
-
+        </div> */}
         <Button
           onClick={handleSave}
           className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
@@ -155,12 +154,12 @@ export default function DrawBoard() {
         >
           <Save size={16} /> Save
         </Button>
-        <Button
+        {/* <Button
           onClick={handleBack}
           className="bg-gray-200 hover:bg-gray-300 text-gray-800 flex items-center gap-2"
         >
           <ArrowLeft size={16} /> Exit to Dashboard
-        </Button>
+        </Button> */}
       </div>
       {/* <div className="absolute top-6 bottom-6 right-6 flex flex-col gap-5 bg-white p-5 rounded-2xl shadow-xl w-[320px] border border-gray-200">
         <div>

@@ -50,15 +50,6 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
 
   const stageRef = useRef<any>(null);
   const historyRef = useRef<ShapeLine[][]>([[]]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setDimensions({ width: window.innerWidth, height: window.innerHeight });
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
   const isInitialMount = useRef(true);
 
   useEffect(() => {
@@ -69,26 +60,37 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // **PERFECT: ONE useEffect - Handles EVERYTHING**
   useEffect(() => {
-    if (!defaultData) {
-      setLines([]);
-      historyRef.current = [[]];
-      setHistoryIndex(0);
-      return;
-    }
-  
+    if (!defaultData) return;
+
     try {
       const parsed: ShapeLine[] = JSON.parse(defaultData);
-      if (Array.isArray(parsed)) {
-        setLines(parsed);
+      if (!Array.isArray(parsed)) return;
+
+      setLines(parsed);
+
+      // **INITIAL LOAD: Set history**
+      if (isInitialMount.current) {
         historyRef.current = [parsed];
         setHistoryIndex(0);
+        isInitialMount.current = false;
       }
+      // **SOCKET UPDATE: Just sync lines, keep history**
+      // No history reset = Undo/Redo preserved!
     } catch (err) {
       console.warn("Invalid defaultData", err);
     }
   }, [defaultData]);
-  
+
+  const updateHistory = (currentLines: ShapeLine[]) => {
+    const newHistory = [
+      ...historyRef.current.slice(0, historyIndex + 1),
+      currentLines,
+    ];
+    historyRef.current = newHistory;
+    setHistoryIndex(newHistory.length - 1);
+  };
 
   const startDrawing = (e: any) => {
     const pos = e.target.getStage().getPointerPosition();
@@ -106,9 +108,8 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
 
     setLines((prev) => {
       const newLines = [...prev, newShape];
-      if (onChange) {
-        onChange(JSON.stringify(newLines));
-      }
+      // **REAL-TIME: Socket on start**
+      if (onChange) onChange(JSON.stringify(newLines));
       return newLines;
     });
   };
@@ -138,9 +139,8 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
         last.radius = Math.sqrt(dx * dx + dy * dy);
       }
 
-      if (onChange) {
-        onChange(JSON.stringify(newLines));
-      }
+      // **REAL-TIME: Socket on EVERY mouse move**
+      if (onChange) onChange(JSON.stringify(newLines));
       return newLines;
     });
   };
@@ -150,14 +150,8 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
     setIsDrawing(false);
 
     setLines((currentLines) => {
-      historyRef.current = [
-        ...historyRef.current.slice(0, historyIndex + 1),
-        currentLines,
-      ];
-      setHistoryIndex(historyRef.current.length - 1);
-      if (onChange) {
-        onChange(JSON.stringify(currentLines));
-      }
+      updateHistory(currentLines);
+      // **REAL-TIME: Socket already sent, no duplicate**
       return currentLines;
     });
   };
@@ -187,11 +181,7 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
   const clear = () => {
     const emptyLines: ShapeLine[] = [];
     setLines(emptyLines);
-    historyRef.current = [
-      ...historyRef.current.slice(0, historyIndex + 1),
-      emptyLines,
-    ];
-    setHistoryIndex(historyRef.current.length - 1);
+    updateHistory(emptyLines);
     if (onChange) {
       onChange(JSON.stringify(emptyLines));
     }
@@ -220,7 +210,7 @@ export default function DrawCanvas({ defaultData, onChange }: DrawCanvasProps) {
                   key={i}
                   points={line.points!}
                   stroke={line.color}
-                  strokeWidth={line.strokeWidth}
+                  strokeWidth={line.lineStrokeWidth}
                   tension={0.5}
                   lineCap="round"
                   lineJoin="round"
