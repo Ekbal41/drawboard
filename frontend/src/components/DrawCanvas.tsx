@@ -31,6 +31,9 @@ import {
   Download,
   ZoomIn,
   ZoomOut,
+  Circle as CircleIcon,
+  Triangle,
+  ArrowRight,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useParams } from "react-router";
@@ -73,14 +76,39 @@ type Tool =
 
 const COLORS = [
   "#000000",
+  "#333333",
+  "#666666",
+  "#999999",
+  "#CCCCCC",
+  "#FFFFFF",
   "#FF0000",
   "#0000FF",
   "#00FF00",
   "#FFFF00",
   "#FF00FF",
+  "#00FFFF",
   "#FFA500",
-  "#FFFFFF",
+  "#800080",
+  "#8B4513",
+  "#A0522D",
+  "#D2691E",
+  "#FFD700",
+  "#708090",
+  "#2E8B57",
+  "#FFB6C1",
+  "#87CEFA",
+  "#98FB98",
+  "#FFFACD",
+  "#E6E6FA",
+  "#FFDAB9",
+  "#F0E68C",
+  "#FF1493",
+  "#1E90FF",
+  "#32CD32",
+  "#FF4500",
+  "#9400D3",
 ];
+
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3;
 const ZOOM_STEP = 0.25;
@@ -552,7 +580,7 @@ export default function DrawCanvas({
             onClick={() => setTool("circle")}
             title="Circle"
           >
-            ○
+            <CircleIcon size={16} />
           </Button>
           <Button
             size="sm"
@@ -560,7 +588,7 @@ export default function DrawCanvas({
             onClick={() => setTool("triangle")}
             title="Triangle"
           >
-            △
+            <Triangle size={16} />
           </Button>
           <Button
             size="sm"
@@ -568,7 +596,7 @@ export default function DrawCanvas({
             onClick={() => setTool("line")}
             title="Line"
           >
-            ─
+            <ArrowRight size={16} />
           </Button>
           <Button
             size="sm"
@@ -620,24 +648,30 @@ export default function DrawCanvas({
             <Button
               variant="outline"
               size="icon"
-              className="w-12 h-12"
+              className="w-8 h-8 rounded-full"
               title="Color"
             >
               <div
-                className="w-8 h-8 rounded-lg border-2 border-border"
+                className="w-8 h-8 rounded-full"
                 style={{ backgroundColor: color }}
               />
             </Button>
           </PopoverTrigger>
           <PopoverContent
-            className="w-56 p-3 bg-popover border-border"
+            className="w-56 p-3 bg-popover border-border rounded-2xl"
             side="right"
           >
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="w-full h-10 mb-2 cursor-pointer bg-background"
+            />
             <div className="grid grid-cols-4 gap-2">
               {COLORS.map((c) => (
                 <button
                   key={c}
-                  className={`w-10 h-10 rounded-lg border-2 border-border hover:scale-110 transition ${
+                  className={`w-10 h-10 rounded-full border-2 border-border hover:scale-110 transition ${
                     color === c ? "ring-2 ring-primary" : ""
                   }`}
                   style={{ backgroundColor: c }}
@@ -645,12 +679,6 @@ export default function DrawCanvas({
                 />
               ))}
             </div>
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="w-full h-10 mt-2 rounded cursor-pointer bg-background"
-            />
           </PopoverContent>
         </Popover>
         <div className="flex flex-col items-center gap-2 py-2">
@@ -674,7 +702,7 @@ export default function DrawCanvas({
         p-3 rounded-2xl shadow-2xl border border-border flex flex-col gap-2"
       >
         <Button
-          size="sm"
+          size="icon"
           variant="ghost"
           onClick={handleZoomIn}
           disabled={zoom >= MAX_ZOOM}
@@ -683,7 +711,7 @@ export default function DrawCanvas({
           <ZoomIn size={18} />
         </Button>
         <Button
-          size="sm"
+          size="icon"
           variant="ghost"
           onClick={resetZoom}
           title="Reset Zoom"
@@ -692,7 +720,7 @@ export default function DrawCanvas({
           {Math.round(zoom * 100)}%
         </Button>
         <Button
-          size="sm"
+          size="icon"
           variant="ghost"
           onClick={handleZoomOut}
           disabled={zoom <= MIN_ZOOM}
@@ -702,7 +730,7 @@ export default function DrawCanvas({
         </Button>
         <div className="border-t border-border my-1" />
         <Button
-          size="sm"
+          size="icon"
           variant="ghost"
           onClick={exportCanvas}
           title="Export as PNG"
@@ -710,7 +738,7 @@ export default function DrawCanvas({
           <Download size={18} />
         </Button>
         <Button
-          size="sm"
+          size="icon"
           variant="ghost"
           onClick={clear}
           className="text-destructive hover:text-destructive"
@@ -757,10 +785,10 @@ export default function DrawCanvas({
         )}
       {selectedId && (
         <div
-          className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-primary 
-          text-primary-foreground px-4 py-2 rounded-full text-sm font-medium shadow-lg"
+          className="absolute top-24 left-1/2 -translate-x-1/2 z-40 bg-primary font-mono
+          text-primary-foreground px-4 py-2 rounded-md text-sm font-medium shadow-lg hidden"
         >
-          Selected:{" "}
+          Selected:
           {lines.find((l) => l.id === selectedId)?.type?.toUpperCase()} • Drag
           to move, use handles to resize
         </div>

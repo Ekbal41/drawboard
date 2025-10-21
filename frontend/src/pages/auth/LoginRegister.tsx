@@ -83,10 +83,10 @@ function LoginRegister() {
               {isRegister
                 ? authLoading === "register"
                   ? "Registering..."
-                  : "Register to Dokanify"
+                  : "Register to Drawboard"
                 : authLoading === "login"
                 ? "Logging in..."
-                : "Login To Dokanify"}
+                : "Login To Drawboard"}
             </Button>
             <Button
               type="button"

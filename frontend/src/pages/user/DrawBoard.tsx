@@ -262,11 +262,9 @@ export default function DrawBoard() {
         )}
       </div>
       {expanded && (
-        <div className="absolute top-6 z-50 left-6 flex flex-col gap-5 bg-white p-5 rounded-2xl shadow-xl w-[320px] border border-gray-200">
-          <div className="flex justify-between items-center border-b pb-3 border-gray-200">
-            <h1 className="text-lg font-semibold text-gray-800 truncate w-full">
-              {drawing?.title}
-            </h1>
+        <div className="absolute top-6 z-50 left-6 flex flex-col gap-5 bg-background p-5 rounded-2xl shadow-xl w-[320px] border">
+          <div className="flex justify-between items-center border-b pb-3 gap-4">
+            <h1 className="text-lg font-semibold w-full">{drawing?.title}</h1>
             <Button
               onClick={() => setExpanded(!expanded)}
               className="rounded-full size-6"
@@ -276,9 +274,7 @@ export default function DrawBoard() {
             </Button>
           </div>
           <div>
-            <h3 className="text-lg font-semibold mb-3 text-gray-800">
-              Collaborators
-            </h3>
+            <h3 className="text-lg font-semibold mb-3">Collaborators</h3>
             <div className="flex items-center gap-2 mb-3">
               <Input
                 type="email"
@@ -301,28 +297,28 @@ export default function DrawBoard() {
                 {drawing.collaborators.map((colab: any) => (
                   <li
                     key={colab.user.email}
-                    className="flex items-center gap-2 p-1.5 rounded-md hover:bg-gray-100 transition"
+                    className="flex items-center gap-2 p-1.5 rounded-md transition"
                   >
                     <div className="rounded-full bg-muted p-3">
-                      <Users size={16} className="text-gray-500" />
+                      <Users size={16} className="text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="font-semibold">
+                      <p className="font-semibold text-sm text-primary">
                         {colab.user.name || "Unnamed"}
                       </p>
-                      <p>({colab.user.email})</p>
+                      <p className="text-muted-foreground text-xs">
+                        ({colab.user.email})
+                      </p>
                     </div>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-gray-500 text-sm italic">
-                No collaborators yet.
-              </p>
+              <p className="text-sm italic">No collaborators yet.</p>
             )}
-            <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+            <div className="mt-4 pt-4 border-t space-y-4">
               <div
-                className="text-sm text-gray-600 bg-muted p-2 rounded break-words"
+                className="text-sm bg-muted p-2 rounded break-words"
                 style={{ wordBreak: "break-all" }}
               >
                 {window.location.origin}/board/{boardId}
