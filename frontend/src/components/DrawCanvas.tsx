@@ -317,6 +317,7 @@ export default function DrawCanvas({
           x: node.x(),
           y: node.y(),
           fontSize: Math.max(8, (line.fontSize || 24) * scaleY),
+          width: Math.max(50, node.width() * scaleX),
         };
       }
       return { ...line, x: node.x(), y: node.y() };
@@ -523,10 +524,12 @@ export default function DrawCanvas({
           {...commonProps}
           x={line.x || 0}
           y={line.y || 0}
+          wrap="word"
           text={line.text || "Click to edit"}
           fontSize={line.fontSize || 24}
+          width={line.width}
           fill={line.color}
-          width={200}
+          fontFamily="cursive"
         />
       );
     }
