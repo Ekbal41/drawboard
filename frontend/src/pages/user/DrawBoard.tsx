@@ -8,7 +8,7 @@ import api from "@/api/axios";
 import DrawCanvas from "@/components/DrawCanvas";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
-import { Loader2, Users, Menu, X } from "lucide-react";
+import { Loader2, Users, Menu, X, UserMinus, UserPlus } from "lucide-react";
 
 export default function DrawBoard() {
   const { user } = useAuth();
@@ -18,6 +18,7 @@ export default function DrawBoard() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [expanded, setExpanded] = useState(false);
   const isRemoteUpdate = useRef(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [cursors, setCursors] = useState<
     Record<
       string,
@@ -49,7 +50,11 @@ export default function DrawBoard() {
     return figmaColors[hash % figmaColors.length];
   };
 
-  const { data: drawing, isLoading } = useQuery({
+  const {
+    data: drawing,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["boardData", boardId],
     queryFn: () => api.get(`/main/boards/${boardId}`).then((res) => res.data),
     enabled: !!boardId,
@@ -144,9 +149,29 @@ export default function DrawBoard() {
     onSuccess: () => {
       toast.success("Collaborator invited successfully!");
       setInviteEmail("");
+      refetch();
     },
     onError: (e: any) => {
       toast.error(e.response?.data?.error || "Failed to invite collaborator");
+    },
+  });
+
+  const removeCollaborator = useMutation({
+    mutationFn: async ({
+      boardId,
+      userId,
+    }: {
+      boardId: string;
+      userId: string;
+    }) => {
+      await api.post("/main/boards/remove/collaborators", { boardId, userId });
+    },
+    onSuccess: () => {
+      toast.success("Collaborator removed successfully!");
+      refetch();
+    },
+    onError: (e: any) => {
+      toast.error(e.response?.data?.error || "Failed to remove collaborator");
     },
   });
 
@@ -195,7 +220,7 @@ export default function DrawBoard() {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-50 text-center px-4">
         <h2 className="text-2xl font-semibold text-gray-800 mb-2">
-          You're not signed in
+          You're not signed in to Drawboard!
         </h2>
         <p className="text-gray-600 mb-6 max-w-md">
           Please sign in to access this drawing board and collaborate with
@@ -211,11 +236,12 @@ export default function DrawBoard() {
     drawing?.collaborators?.some(
       (colab: any) => colab.user.email === user.email
     );
+  const isOwner = drawing?.ownerId === user.id;
 
   if (!isCollaborator) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-50 text-center px-4">
-        <Users className="w-12 h-12 text-gray-400 mb-3" />
+        <Users className="size-16 text-primary mb-3" />
         <h2 className="text-2xl font-semibold text-gray-800 mb-2">
           Access Restricted
         </h2>
@@ -262,8 +288,8 @@ export default function DrawBoard() {
         )}
       </div>
       {expanded && (
-        <div className="absolute top-6 z-50 left-6 flex flex-col gap-5 bg-background p-5 rounded-2xl shadow-xl w-[320px] border">
-          <div className="flex justify-between items-center border-b pb-3 gap-4">
+        <div className="absolute top-6 z-50 left-6 flex flex-col bg-background rounded-2xl shadow-xl w-[320px] border">
+          <div className="flex justify-between items-center border-b px-4 py-3 gap-4">
             <h1 className="text-lg font-semibold w-full">{drawing?.title}</h1>
             <Button
               onClick={() => setExpanded(!expanded)}
@@ -274,51 +300,91 @@ export default function DrawBoard() {
             </Button>
           </div>
           <div>
-            <h3 className="text-lg font-semibold mb-3">Collaborators</h3>
-            <div className="flex items-center gap-2 mb-3">
-              <Input
-                type="email"
-                placeholder="Collaborator's Email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-              />
-              <Button
-                onClick={() => {
-                  if (boardId)
-                    inviteMutation.mutate({ boardId, userEmail: inviteEmail });
-                }}
-                disabled={inviteMutation.isPending}
-              >
-                Invite
-              </Button>
-            </div>
-            {drawing?.collaborators?.length > 0 ? (
-              <ul className="text-sm text-gray-700 space-y-1">
-                {drawing.collaborators.map((colab: any) => (
-                  <li
-                    key={colab.user.email}
-                    className="flex items-center gap-2 p-1.5 rounded-md transition"
+            <div className="px-4 py-3">
+              <h3 className="text-lg font-semibold mb-3">Collaborators</h3>
+              {isOwner && (
+                <div className="flex items-center gap-2 mb-3">
+                  <Input
+                    type="email"
+                    placeholder="Collaborator's Email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                  />
+                  <Button
+                    onClick={() => {
+                      if (boardId)
+                        inviteMutation.mutate({
+                          boardId,
+                          userEmail: inviteEmail,
+                        });
+                    }}
+                    disabled={inviteMutation.isPending}
                   >
-                    <div className="rounded-full bg-muted p-3">
-                      <Users size={16} className="text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm text-primary">
-                        {colab.user.name || "Unnamed"}
-                      </p>
-                      <p className="text-muted-foreground text-xs">
-                        ({colab.user.email})
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm italic">No collaborators yet.</p>
-            )}
-            <div className="mt-4 pt-4 border-t space-y-4">
+                    {inviteMutation.isPending ? (
+                      <Loader2 className="animate-spin size-4" />
+                    ) : (
+                      <UserPlus />
+                    )}
+                  </Button>
+                </div>
+              )}
+              {drawing?.collaborators?.length > 0 ? (
+                <ul className="text-sm text-gray-700 space-y-1">
+                  {drawing.collaborators.map((colab: any) => (
+                    <li
+                      key={colab.user.email}
+                      className="flex items-center justify-between gap-2 p-1.5 rounded-md transition hover:bg-muted/50"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="rounded-full bg-muted p-3">
+                          <Users size={16} className="text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm text-primary">
+                            {colab.user.name || "Unnamed"}
+                          </p>
+                          <p className="text-muted-foreground text-xs">
+                            {colab.user.email}
+                          </p>
+                        </div>
+                      </div>
+                      {isOwner && (
+                        <Button
+                          size={"icon"}
+                          variant={"ghost"}
+                          className="rounded-full"
+                          onClick={() => {
+                            if (boardId) {
+                              setRemovingId(colab.user.id);
+                              removeCollaborator.mutate({
+                                boardId,
+                                userId: colab.user.id,
+                              });
+                            }
+                          }}
+                          disabled={
+                            removingId === colab.user.id &&
+                            removeCollaborator.isPending
+                          }
+                        >
+                          {removingId === colab.user.id &&
+                          removeCollaborator.isPending ? (
+                            <Loader2 className="animate-spin size-4 ml-1" />
+                          ) : (
+                            <UserMinus size={16} />
+                          )}
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm italic">No collaborators yet.</p>
+              )}
+            </div>
+            <div className="p-4 border-t space-y-4">
               <div
-                className="text-sm bg-muted p-2 rounded break-words"
+                className="text-sm bg-muted/50 border border-muted p-2 rounded break-words"
                 style={{ wordBreak: "break-all" }}
               >
                 {window.location.origin}/board/{boardId}

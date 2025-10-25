@@ -54,11 +54,11 @@ export default function Account() {
               "https://static.vecteezy.com/system/resources/thumbnails/009/292/244/small_2x/default-avatar-icon-of-social-media-user-vector.jpg"
             }
             alt="User Avatar"
-            className="h-14 w-14 rounded-lg"
+            className="size-12 rounded-full"
           />
           <div>
-            <h1 className="text-2xl font-semibold">{user?.name}</h1>
-            <p className="text-muted-foreground">{user?.email}</p>
+            <h1 className="text-xl font-semibold">{user?.name}</h1>
+            <p className="text-muted-foreground text-sm">{user?.email}</p>
           </div>
         </div>
         <Button
@@ -76,8 +76,8 @@ export default function Account() {
       ) : (
         <div className="space-y-6">
           {!user?.emailVerified && (
-            <Card>
-              <CardHeader className="border-b">
+            <Card className="pt-0 overflow-hidden">
+              <CardHeader className="border-b bg-muted pt-7">
                 <CardTitle className="text-xl">Verify Your Email</CardTitle>
               </CardHeader>
               <CardContent>
@@ -89,7 +89,7 @@ export default function Account() {
               </CardContent>
               <CardFooter className="flex justify-end">
                 <Button
-                  variant="outline"
+                  variant="default"
                   onClick={sendEmailVerification}
                   disabled={sending}
                   className="w-full md:w-auto"
@@ -99,8 +99,8 @@ export default function Account() {
               </CardFooter>
             </Card>
           )}
-          <Card>
-            <CardHeader className="border-b">
+          <Card className="pt-0 overflow-hidden">
+            <CardHeader className="border-b bg-muted pt-7">
               <CardTitle className="text-xl">Update Password</CardTitle>
             </CardHeader>
             <CardContent>
@@ -112,7 +112,7 @@ export default function Account() {
             <CardFooter className="flex justify-end">
               <Link to="/auth/change-password" className="w-full md:w-auto">
                 <Button
-                  variant="outline"
+                  variant="default"
                   className="flex items-center gap-2 w-full md:w-auto"
                 >
                   <Key className="h-4 w-4" />

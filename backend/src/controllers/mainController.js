@@ -158,26 +158,57 @@ exports.addCollaborator = async (req, res) => {
     const ownerId = req.user.id;
 
     const board = await prisma.board.findUnique({ where: { id: boardId } });
-    if (!board) return res.status(404).json({ error: "Board not found" });
-    if (board.ownerId !== ownerId)
+    if (!board) {
+      return res.status(404).json({ error: "Board not found" });
+    }
+    if (board.ownerId !== ownerId) {
       return res
         .status(403)
-        .json({ error: "Only owner can invite collaborators" });
-
+        .json({ error: "Only the board owner can invite collaborators" });
+    }
     const userToAdd = await prisma.user.findUnique({
       where: { email: userEmail },
     });
-    if (!userToAdd) return res.status(404).json({ error: "User not found" });
-
+    if (!userToAdd) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    if (userToAdd.id === ownerId) {
+      return res
+        .status(400)
+        .json({ error: "You cannot add yourself as a collaborator" });
+    }
     await prisma.collaboration.upsert({
       where: { userId_boardId: { userId: userToAdd.id, boardId } },
       update: {},
       create: { userId: userToAdd.id, boardId },
     });
 
-    res.json({ message: "Collaborator added successfully" });
+    return res.json({ message: "Collaborator added successfully" });
   } catch (error) {
     console.error("Error adding collaborator:", error);
-    res.status(500).json({ error: "Failed to add collaborator" });
+    return res.status(500).json({ error: "Failed to add collaborator" });
+  }
+};
+
+exports.removeCollaborator = async (req, res) => {
+  try {
+    const { boardId, userId: collaboratorId } = req.body;
+    const ownerId = req.user.id;
+
+    const board = await prisma.board.findUnique({ where: { id: boardId } });
+    if (!board) return res.status(404).json({ error: "Board not found" });
+    if (board.ownerId !== ownerId)
+      return res
+        .status(403)
+        .json({ error: "Only owner can remove collaborators" });
+
+    await prisma.collaboration.delete({
+      where: { userId_boardId: { userId: collaboratorId, boardId } },
+    });
+
+    res.json({ message: "Collaborator removed successfully" });
+  } catch (error) {
+    console.error("Error removing collaborator:", error);
+    res.status(500).json({ error: "Failed to remove collaborator" });
   }
 };
