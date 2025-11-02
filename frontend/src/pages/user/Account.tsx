@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { DoorOpen, Key } from "lucide-react";
+import { DoorOpen, Key, Loader } from "lucide-react";
 import api from "@/api/axios";
 import { toast } from "sonner";
 import {
@@ -47,7 +47,7 @@ export default function Account() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center gap-4 flex-wrap">
+      <div className="flex justify-between items-center gap-4 flex-wrap border p-4 rounded-lg bg-muted">
         <div className="flex items-center gap-4">
           <img
             src={
@@ -66,7 +66,15 @@ export default function Account() {
           onClick={logout}
           className="flex items-center gap-2 w-full md:w-fit"
         >
-          <DoorOpen className="h-4 w-4" /> Log Out
+          {authLoading === "logout" ? (
+            <>
+              <Loader className="w-4 h-4 animate-spin" /> Logging Out
+            </>
+          ) : (
+            <>
+              <DoorOpen className="h-4 w-4" /> Log Out
+            </>
+          )}
         </Button>
       </div>
       {authLoading === "user" ? (

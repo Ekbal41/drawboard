@@ -1,4 +1,5 @@
 import { ModeToggle } from "@/components/mode-toggle";
+import NotificationBell from "@/components/NotificationBell";
 import { PenTool } from "lucide-react";
 import { Link, Outlet } from "react-router";
 
@@ -14,6 +15,7 @@ export default function MainLayout() {
             <p className="text-3xl font-bold">DrawBoard</p>
           </Link>
           <div className="flex items-center gap-4">
+            <NotificationBell types="user,system" />
             <ModeToggle />
           </div>
         </div>

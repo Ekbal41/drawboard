@@ -1,8 +1,7 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
-/**
- * @desc Save or update board content
- */
+const { addNotification } = require("./notificationController");
+
 exports.saveBoard = async (req, res) => {
   try {
     const { boardId, drawing } = req.body;
@@ -39,9 +38,6 @@ exports.saveBoard = async (req, res) => {
   }
 };
 
-/**
- * @desc Get all boards for logged-in user (owned or collaborated)
- */
 exports.getAllBoards = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -66,9 +62,6 @@ exports.getAllBoards = async (req, res) => {
   }
 };
 
-/**
- * @desc Create a new board
- */
 exports.createBoard = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -86,15 +79,18 @@ exports.createBoard = async (req, res) => {
     });
 
     res.status(201).json(newBoard);
+    await addNotification({
+      type: "user",
+      targetId: userId,
+      identifier: userId,
+      message: `New board "${newBoard.title}" created.`,
+    });
   } catch (error) {
     console.error("Error creating board:", error);
     res.status(500).json({ error: "Failed to create board" });
   }
 };
 
-/**
- * @desc Get single board by ID
- */
 exports.getBoardById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -126,9 +122,6 @@ exports.getBoardById = async (req, res) => {
   }
 };
 
-/**
- * @desc Delete board (only owner)
- */
 exports.deleteBoard = async (req, res) => {
   try {
     const { id } = req.params;
@@ -143,15 +136,18 @@ exports.deleteBoard = async (req, res) => {
 
     await prisma.board.delete({ where: { id } });
     res.json({ message: "Board deleted successfully" });
+    await addNotification({
+      type: "user",
+      targetId: userId,
+      identifier: userId,
+      message: `Board "${board.title}" deleted.`,
+    });
   } catch (error) {
     console.error("Error deleting board:", error);
     res.status(500).json({ error: "Failed to delete board" });
   }
 };
 
-/**
- * @desc Add collaborator to a board
- */
 exports.addCollaborator = async (req, res) => {
   try {
     const { boardId, userEmail } = req.body;

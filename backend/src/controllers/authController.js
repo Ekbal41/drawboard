@@ -332,7 +332,7 @@ exports.sendPassResetLinkEmail = async (req, res, next) => {
     // Send email
     await sendEmail({
       sendTo: email,
-      senderName: "Dokanify",
+      senderName: "Drawboard",
       emailSubject: "Reset Password Instructions",
       htmlTemplate: "reset-password.html",
       templateData: {

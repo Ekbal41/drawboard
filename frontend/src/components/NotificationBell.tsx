@@ -36,7 +36,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import dayjs from "dayjs";
 import { useSoundPlayer } from "@/hooks/useSoundPlayer";
+import relativeTime from "dayjs/plugin/relativeTime";
 
+dayjs.extend(relativeTime);
 interface NotificationPayload {
   productId?: string;
   stock?: number;
@@ -268,7 +270,7 @@ export default function NotificationBell({ types }: { types: string }) {
   return (
     <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
       <DropdownMenuTrigger asChild>
-        <Button className="relative" variant="outline" size="icon">
+        <Button className="relative rounded-full" variant="outline" size="icon">
           {shakebell ? (
             <BellRing className="w-5 h-5 bell-ring" />
           ) : (

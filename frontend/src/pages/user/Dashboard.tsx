@@ -46,8 +46,6 @@ export default function Dashboard() {
     },
     staleTime: 1000 * 60 * 10, // 10 minutes
   });
-
-  console.log(boards);
   const createBoardMutation = useMutation({
     mutationFn: async (title: string) => {
       const res = await api.post("/main/boards", { title });
