@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Stage,
   Layer,
@@ -34,10 +34,12 @@ import {
   Circle as CircleIcon,
   Triangle,
   ArrowRight,
+  RotateCcw,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useParams } from "react-router";
 import { useSocket } from "@/hooks/useSocket";
+import { ScrollArea } from "./ui/scroll-area";
 
 export interface ShapeLine {
   id: string;
@@ -112,7 +114,7 @@ const COLORS = [
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3;
 const ZOOM_STEP = 0.25;
-
+const RECENT_KEY = "recent-colors";
 export default function DrawCanvas({
   lines,
   onLinesChange,
@@ -136,6 +138,30 @@ export default function DrawCanvas({
   const { user } = useAuth();
   const { boardId } = useParams<{ boardId: string }>();
   const socket = useSocket(user?.id ?? "", {});
+  const [recentColors, setRecentColors] = useState<string[]>([]);
+  const randomColors = useMemo(
+    () =>
+      Array.from(
+        { length: 6 },
+        () => `#${Math.floor(Math.random() * 16777215).toString(16)}`
+      ),
+    []
+  );
+
+  const addColor = (color: string) => {
+    setColor(color);
+
+    const updated = [color, ...recentColors.filter((x) => x !== color)].slice(
+      0,
+      10
+    );
+    setRecentColors(updated);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(updated));
+  };
+  useEffect(() => {
+    const stored = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+    setRecentColors(stored);
+  }, []);
 
   useEffect(() => {
     if (history.length === 1 && history[0].length === 0 && lines.length > 0) {
@@ -535,6 +561,16 @@ export default function DrawCanvas({
     }
     return null;
   };
+  const renderColorSwatch = (v: string) => (
+    <button
+      key={v}
+      className={`w-full h-10 hover:scale-110 transition ${
+        color === v ? "ring-2 ring-primary" : ""
+      }`}
+      style={{ backgroundColor: v }}
+      onClick={() => addColor(v)}
+    />
+  );
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-gradient-to-br from-background to-muted">
@@ -542,78 +578,78 @@ export default function DrawCanvas({
         className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-card/95 
         backdrop-blur px-4 py-3 rounded-2xl shadow-2xl border border-border"
       >
-        <div className="flex gap-1 border-r border-border pr-2">
+        <div className="flex gap-2 border-r border-border pr-2">
           <Button
-            size="sm"
-            variant={tool === "select" ? "default" : "ghost"}
+            size="icon"
+            variant={tool === "select" ? "default" : "secondary"}
             onClick={() => setTool("select")}
             title="Select (V)"
           >
             <Move size={16} />
           </Button>
           <Button
-            size="sm"
-            variant={tool === "brush" ? "default" : "ghost"}
+            size="icon"
+            variant={tool === "brush" ? "default" : "secondary"}
             onClick={() => setTool("brush")}
             title="Brush (B)"
           >
             <Brush size={16} />
           </Button>
           <Button
-            size="sm"
-            variant={tool === "eraser" ? "default" : "ghost"}
+            size="icon"
+            variant={tool === "eraser" ? "default" : "secondary"}
             onClick={() => setTool("eraser")}
             title="Eraser (E)"
           >
             <Eraser size={16} />
           </Button>
         </div>
-        <div className="flex gap-1 border-r border-border pr-2">
+        <div className="flex gap-2 border-r border-border pr-2">
           <Button
-            size="sm"
-            variant={tool === "rect" ? "default" : "ghost"}
+            size="icon"
+            variant={tool === "rect" ? "default" : "secondary"}
             onClick={() => setTool("rect")}
             title="Rectangle"
           >
             <Square size={16} />
           </Button>
           <Button
-            size="sm"
-            variant={tool === "circle" ? "default" : "ghost"}
+            size="icon"
+            variant={tool === "circle" ? "default" : "secondary"}
             onClick={() => setTool("circle")}
             title="Circle"
           >
             <CircleIcon size={16} />
           </Button>
           <Button
-            size="sm"
-            variant={tool === "triangle" ? "default" : "ghost"}
+            size="icon"
+            variant={tool === "triangle" ? "default" : "secondary"}
             onClick={() => setTool("triangle")}
             title="Triangle"
           >
             <Triangle size={16} />
           </Button>
           <Button
-            size="sm"
-            variant={tool === "line" ? "default" : "ghost"}
+            size="icon"
+            variant={tool === "line" ? "default" : "secondary"}
             onClick={() => setTool("line")}
             title="Line"
           >
             <ArrowRight size={16} />
           </Button>
           <Button
-            size="sm"
-            variant={tool === "text" ? "default" : "ghost"}
+            size="icon"
+            variant={tool === "text" ? "default" : "secondary"}
             onClick={() => setTool("text")}
             title="Text"
           >
             <Type size={16} />
           </Button>
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-2">
           <Button
-            size="sm"
-            variant="ghost"
+            size="icon"
+            variant="secondary"
             onClick={undo}
             disabled={historyIndex <= 0}
             title="Undo (Ctrl+Z)"
@@ -621,8 +657,8 @@ export default function DrawCanvas({
             <Undo size={16} />
           </Button>
           <Button
-            size="sm"
-            variant="ghost"
+            size="icon"
+            variant="secondary"
             onClick={redo}
             disabled={historyIndex >= history.length - 1}
             title="Redo (Ctrl+Y)"
@@ -631,8 +667,8 @@ export default function DrawCanvas({
           </Button>
           {selectedId && (
             <Button
-              size="sm"
-              variant="ghost"
+              size="icon"
+              variant="secondary"
               onClick={deleteSelected}
               className="text-destructive hover:text-destructive"
               title="Delete (Del)"
@@ -648,40 +684,50 @@ export default function DrawCanvas({
       >
         <Popover>
           <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="w-8 h-8 rounded-full"
-              title="Color"
-            >
+            <Button variant="secondary" size="icon" title="Color">
               <div
-                className="w-8 h-8 rounded-full"
+                className="w-full h-full rounded-lg"
                 style={{ backgroundColor: color }}
               />
             </Button>
           </PopoverTrigger>
           <PopoverContent
-            className="w-56 p-3 bg-popover border-border rounded-2xl"
+            className="w-80 bg-popover border-border rounded-2xl mt-4 p-0 overflow-hidden"
             side="right"
           >
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="w-full h-10 mb-2 cursor-pointer bg-background"
-            />
-            <div className="grid grid-cols-4 gap-2">
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  className={`w-10 h-10 rounded-full border-2 border-border hover:scale-110 transition ${
-                    color === c ? "ring-2 ring-primary" : ""
-                  }`}
-                  style={{ backgroundColor: c }}
-                  onClick={() => setColor(c)}
-                />
-              ))}
-            </div>
+            <ScrollArea className="h-[80dvh] p-4">
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium inline-block mb-3">
+                    Pick Color
+                  </Label>
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={(e) => addColor(e.target.value)}
+                    className="w-full h-10 cursor-pointer bg-background rounded-2xl"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Recent Colors</Label>
+                  <div className="grid grid-cols-5 gap-2 mt-4">
+                    {recentColors.map(renderColorSwatch)}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Default Colors</Label>
+                  <div className="grid grid-cols-5 gap-2 mt-4">
+                    {COLORS.map(renderColorSwatch)}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Random Colors</Label>
+                  <div className="grid grid-cols-5 gap-2 mt-4">
+                    {randomColors.map(renderColorSwatch)}
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
           </PopoverContent>
         </Popover>
         <div className="flex flex-col items-center gap-2 py-2">
@@ -706,7 +752,7 @@ export default function DrawCanvas({
       >
         <Button
           size="icon"
-          variant="ghost"
+          variant="secondary"
           onClick={handleZoomIn}
           disabled={zoom >= MAX_ZOOM}
           title="Zoom In"
@@ -715,16 +761,16 @@ export default function DrawCanvas({
         </Button>
         <Button
           size="icon"
-          variant="ghost"
+          variant="secondary"
           onClick={resetZoom}
           title="Reset Zoom"
           className="text-xs font-bold"
         >
-          {Math.round(zoom * 100)}%
+          <RotateCcw />
         </Button>
         <Button
           size="icon"
-          variant="ghost"
+          variant="secondary"
           onClick={handleZoomOut}
           disabled={zoom <= MIN_ZOOM}
           title="Zoom Out"
@@ -734,7 +780,7 @@ export default function DrawCanvas({
         <div className="border-t border-border my-1" />
         <Button
           size="icon"
-          variant="ghost"
+          variant="secondary"
           onClick={exportCanvas}
           title="Export as PNG"
         >
@@ -742,7 +788,7 @@ export default function DrawCanvas({
         </Button>
         <Button
           size="icon"
-          variant="ghost"
+          variant="secondary"
           onClick={clear}
           className="text-destructive hover:text-destructive"
           title="Clear Canvas"
@@ -754,13 +800,13 @@ export default function DrawCanvas({
         lines.find((l) => l.id === selectedId)?.type === "text" && (
           <div
             className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 bg-card/95 backdrop-blur 
-            p-4 rounded-2xl shadow-2xl border border-border w-[600px]"
+            p-3 rounded-2xl shadow-2xl border border-border w-[600px]"
           >
-            <div className="flex gap-3">
+            <div className="flex gap-3 items-center">
               <Input
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
-                placeholder="Enter text..."
+                placeholder="Edit text..."
                 className="flex-1 bg-background"
                 onKeyDown={(e) => e.key === "Enter" && handleTextSubmit()}
                 autoFocus
@@ -773,11 +819,11 @@ export default function DrawCanvas({
                 onValueChange={(v) => setFontSize(v[0])}
                 className="w-24"
               />
-              <div className="text-xs font-medium pt-3 text-muted-foreground">
+              <div className="text-xs font-medium text-muted-foreground">
                 {fontSize}px
               </div>
               <Button
-                size="sm"
+                size="default"
                 onClick={handleTextSubmit}
                 className="bg-primary hover:bg-primary/90"
               >
