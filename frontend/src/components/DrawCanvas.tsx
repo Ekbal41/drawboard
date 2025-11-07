@@ -107,8 +107,6 @@ const COLORS = [
   "#FF1493",
   "#1E90FF",
   "#32CD32",
-  "#FF4500",
-  "#9400D3",
 ];
 
 const MIN_ZOOM = 0.25;
@@ -142,7 +140,7 @@ export default function DrawCanvas({
   const randomColors = useMemo(
     () =>
       Array.from(
-        { length: 6 },
+        { length: 15 },
         () => `#${Math.floor(Math.random() * 16777215).toString(16)}`
       ),
     []
@@ -564,8 +562,8 @@ export default function DrawCanvas({
   const renderColorSwatch = (v: string) => (
     <button
       key={v}
-      className={`w-full h-10 hover:scale-110 transition ${
-        color === v ? "ring-2 ring-primary" : ""
+      className={`w-full h-10 transition border ${
+        color === v ? "border-primary border-2" : ""
       }`}
       style={{ backgroundColor: v }}
       onClick={() => addColor(v)}
@@ -696,8 +694,8 @@ export default function DrawCanvas({
             side="right"
           >
             <ScrollArea className="h-[80dvh] p-4">
-              <div className="space-y-4">
-                <div>
+              <div>
+                <div className="mb-3">
                   <p className="text-sm font-medium inline-block mb-3">
                     Pick Color
                   </p>
@@ -705,17 +703,20 @@ export default function DrawCanvas({
                     type="color"
                     value={color}
                     onChange={(e) => addColor(e.target.value)}
-                    className="w-full h-10 cursor-pointer bg-background rounded-2xl"
+                    className="w-full h-10 cursor-pointer"
+                    style={{
+                      backgroundColor: color,
+                    }}
                   />
                 </div>
                 {recentColors?.length > 0 && (
-                  <div>
+                  <div className="mb-4">
                     <div className="text-sm font-medium flex items-center justify-between">
                       Recent Colors
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="p-1"
+                        className="size-6"
                         onClick={() => {
                           localStorage.removeItem(RECENT_KEY);
                           setRecentColors([]);
@@ -729,13 +730,13 @@ export default function DrawCanvas({
                     </div>
                   </div>
                 )}
-                <div>
+                <div className="mb-4">
                   <p className="text-sm font-medium">Default Colors</p>
                   <div className="grid grid-cols-5 gap-2 mt-4">
                     {COLORS.map(renderColorSwatch)}
                   </div>
                 </div>
-                <div>
+                <div className="mb-4">
                   <p className="text-sm font-medium">Random Colors</p>
                   <div className="grid grid-cols-5 gap-2 mt-4">
                     {randomColors.map(renderColorSwatch)}
