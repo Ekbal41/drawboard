@@ -698,9 +698,9 @@ export default function DrawCanvas({
             <ScrollArea className="h-[80dvh] p-4">
               <div className="space-y-4">
                 <div>
-                  <Label className="text-sm font-medium inline-block mb-3">
+                  <p className="text-sm font-medium inline-block mb-3">
                     Pick Color
-                  </Label>
+                  </p>
                   <input
                     type="color"
                     value={color}
@@ -708,20 +708,35 @@ export default function DrawCanvas({
                     className="w-full h-10 cursor-pointer bg-background rounded-2xl"
                   />
                 </div>
-                <div>
-                  <Label className="text-sm font-medium">Recent Colors</Label>
-                  <div className="grid grid-cols-5 gap-2 mt-4">
-                    {recentColors.map(renderColorSwatch)}
+                {recentColors?.length > 0 && (
+                  <div>
+                    <div className="text-sm font-medium flex items-center justify-between">
+                      Recent Colors
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="p-1"
+                        onClick={() => {
+                          localStorage.removeItem(RECENT_KEY);
+                          setRecentColors([]);
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-5 gap-2 mt-4">
+                      {recentColors.map(renderColorSwatch)}
+                    </div>
                   </div>
-                </div>
+                )}
                 <div>
-                  <Label className="text-sm font-medium">Default Colors</Label>
+                  <p className="text-sm font-medium">Default Colors</p>
                   <div className="grid grid-cols-5 gap-2 mt-4">
                     {COLORS.map(renderColorSwatch)}
                   </div>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Random Colors</Label>
+                  <p className="text-sm font-medium">Random Colors</p>
                   <div className="grid grid-cols-5 gap-2 mt-4">
                     {randomColors.map(renderColorSwatch)}
                   </div>
@@ -730,8 +745,20 @@ export default function DrawCanvas({
             </ScrollArea>
           </PopoverContent>
         </Popover>
-        <div className="flex flex-col items-center gap-2 py-2">
-          <div className="text-xs font-medium text-muted-foreground">Width</div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="text-[10px] font-medium text-muted-foreground tracking-wide uppercase">
+            Brush
+          </div>
+          <div className="h-[20px] w-[20px] min-w-[20px] flex justify-center items-center">
+            <div
+              className="rounded-full bg-foreground/80 transition-all"
+              style={{
+                width: strokeWidth,
+                height: strokeWidth,
+                backgroundColor: tool === "eraser" ? "#ffffff" : color,
+              }}
+            />
+          </div>
           <Slider
             value={[strokeWidth]}
             min={1}
@@ -739,9 +766,9 @@ export default function DrawCanvas({
             step={1}
             onValueChange={(v) => setStrokeWidth(v[0])}
             orientation="vertical"
-            className="h-24"
+            className="h-28"
           />
-          <div className="text-sm font-bold text-foreground">
+          <div className="text-[12px] font-medium opacity-70">
             {strokeWidth}px
           </div>
         </div>
@@ -915,8 +942,8 @@ export default function DrawCanvas({
         </Layer>
       </Stage>
       <div
-        className="absolute bottom-4 right-4 z-40 bg-card/90 text-card-foreground 
-        px-3 py-2 rounded-lg text-xs font-mono border border-border shadow-lg"
+        className="absolute bottom-2.5 right-4 z-40 text-card-foreground 
+        text-xs font-mono uppercase"
       >
         Objects: {lines.length} | History: {historyIndex + 1}/{history.length} |
         Zoom: {Math.round(zoom * 100)}%
