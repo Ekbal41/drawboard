@@ -13,7 +13,6 @@ import {
 } from "react-konva";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
@@ -40,6 +39,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useParams } from "react-router";
 import { useSocket } from "@/hooks/useSocket";
 import { ScrollArea } from "./ui/scroll-area";
+import { Textarea } from "./ui/textarea";
 
 export interface ShapeLine {
   id: string;
@@ -125,6 +125,8 @@ export default function DrawCanvas({
   const [strokeWidth, setStrokeWidth] = useState(3);
   const [fontSize, setFontSize] = useState(24);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
   const [textInput, setTextInput] = useState("");
   const [history, setHistory] = useState<ShapeLine[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -199,7 +201,7 @@ export default function DrawCanvas({
           redo();
         }
       }
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
+      if (e.key === "Delete" && selectedId) {
         if (!(e.target instanceof HTMLInputElement)) {
           e.preventDefault();
           deleteSelected();
@@ -304,11 +306,22 @@ export default function DrawCanvas({
   const handleShapeClick = (id: string, e?: any) => {
     if (tool !== "select") return;
     if (e) e.cancelBubble = true;
+    const clickedId = e.target.id();
+    const isShift = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
+
+    if (isShift) {
+      setSelectedIds((prevSelectedId) => {
+        return prevSelectedId.includes(clickedId)
+          ? prevSelectedId.filter((id) => id !== clickedId)
+          : [...prevSelectedId, clickedId];
+      });
+    }
     const wasSelected = selectedId === id;
     setSelectedId(wasSelected ? null : id);
     const shape = lines.find((l) => l.id === id);
     if (shape && shape.type === "text" && !wasSelected) {
       setTextInput(shape.text || "");
+      setFontSize(shape.fontSize || 24);
     } else {
       setTextInput("");
     }
@@ -336,12 +349,26 @@ export default function DrawCanvas({
           radius: Math.max(5, node.radius() * Math.max(scaleX, scaleY)),
         };
       } else if (line.type === "text") {
+        const scaleX = node.scaleX();
+        const scaleY = node.scaleY();
+        const uniformScale = (scaleX + scaleY) / 2;
+        const baseFontSize = line.fontSize || fontSize || 16;
+        const baseLineHeight = line.height || 1.2;
+        const baseWidth = line.width || node.width();
+        node.scaleX(1);
+        node.scaleY(1);
+        const newFontSize = Math.max(8, baseFontSize * uniformScale);
+        setFontSize(Math.round(newFontSize));
+
         return {
           ...line,
           x: node.x(),
           y: node.y(),
-          fontSize: Math.max(8, (line.fontSize || 24) * scaleY),
-          width: Math.max(50, node.width() * scaleX),
+          width: Math.max(50, baseWidth * scaleX),
+          fontSize: Math.round(newFontSize),
+          lineHeight: baseLineHeight * uniformScale,
+          align: node.align(),
+          verticalAlign: node.verticalAlign(),
         };
       }
       return { ...line, x: node.x(), y: node.y() };
@@ -370,7 +397,12 @@ export default function DrawCanvas({
     if (!selectedId) return;
     const newLines = lines.map((l) =>
       l.id === selectedId
-        ? { ...l, text: textInput || "Text", fontSize: fontSize / zoom }
+        ? {
+            ...l,
+            text: textInput || "Text",
+            fontSize: fontSize / zoom,
+            width: 300,
+          }
         : l
     );
     updateLines(newLines);
@@ -569,6 +601,42 @@ export default function DrawCanvas({
       onClick={() => addColor(v)}
     />
   );
+
+  const handleGroupDragEnd = (e: any) => {
+    const node = e.target;
+    const dx = node.x() - node.attrs._lastX;
+    const dy = node.y() - node.attrs._lastY;
+    node.attrs._lastX = node.x();
+    node.attrs._lastY = node.y();
+
+    const newLines = () =>
+      lines.map((l) => {
+        if (selectedIds.includes(l.id)) {
+          return { ...l, x: (l.x || 0) + dx, y: (l.y || 0) + dy };
+        }
+        return l;
+      });
+
+    updateLines(newLines());
+    updateHistory(newLines());
+  };
+  useEffect(() => {
+    if (selectedIds.length === 0) return;
+    if (!transformerRef.current || !stageRef.current) return;
+
+    const stage = stageRef.current;
+    const selectedNodes = selectedIds
+      .map((id) => stage.findOne(`#${id}`))
+      .filter(Boolean) as any;
+
+    if (selectedNodes.length === 0) {
+      transformerRef.current.nodes([]);
+      return;
+    }
+
+    transformerRef.current.nodes(selectedNodes);
+    transformerRef.current.getLayer()?.batchDraw();
+  }, [selectedIds]);
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-gradient-to-br from-background to-muted">
@@ -830,8 +898,28 @@ export default function DrawCanvas({
             className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 bg-card/95 backdrop-blur 
             p-3 rounded-2xl shadow-2xl border border-border w-[600px]"
           >
-            <div className="flex gap-3 items-center">
-              <Input
+            <div className="flex flex-col gap-3 items-center">
+              <div className="flex w-full items-center bg-muted border p-2 gap-2 rounded-lg">
+                <Slider
+                  value={[fontSize]}
+                  min={12}
+                  max={72}
+                  step={4}
+                  onValueChange={(v) => setFontSize(v[0])}
+                  className="flex-1 border h-4 px-2 rounded-full"
+                />
+                <div className="text-xs font-medium text-muted-foreground">
+                  {fontSize}px
+                </div>
+                <Button
+                  size="default"
+                  onClick={handleTextSubmit}
+                  className="bg-primary hover:bg-primary/90"
+                >
+                  Apply
+                </Button>
+              </div>
+              <Textarea
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
                 placeholder="Edit text..."
@@ -839,24 +927,6 @@ export default function DrawCanvas({
                 onKeyDown={(e) => e.key === "Enter" && handleTextSubmit()}
                 autoFocus
               />
-              <Slider
-                value={[fontSize]}
-                min={12}
-                max={72}
-                step={4}
-                onValueChange={(v) => setFontSize(v[0])}
-                className="w-24"
-              />
-              <div className="text-xs font-medium text-muted-foreground">
-                {fontSize}px
-              </div>
-              <Button
-                size="default"
-                onClick={handleTextSubmit}
-                className="bg-primary hover:bg-primary/90"
-              >
-                Apply
-              </Button>
             </div>
           </div>
         )}
@@ -884,6 +954,7 @@ export default function DrawCanvas({
         onWheel={handleWheel}
         draggable={tool === "select" && !selectedId}
         style={{ cursor: getCursor() }}
+        className="dark:bg-white"
         onMouseMove={handleMouseMove}
         onMouseLeave={() => {
           if (boardId && socket && user) {
@@ -906,6 +977,8 @@ export default function DrawCanvas({
               anchorSize={8 / zoom}
               anchorCornerRadius={2 / zoom}
               rotateEnabled={true}
+              draggable
+              onDragEnd={handleGroupDragEnd}
             />
           )}
         </Layer>
